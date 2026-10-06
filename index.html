@@ -1,0 +1,1309 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Arctic Expedition: Aurora Borealis 3D AAA Simulator</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Phosphor Icons -->
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <!-- Three.js r128 & PointerLockControls -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/PointerLockControls.js"></script>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Cinzel:wght@700;900&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #010409;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      color: #e2e8f0;
+    }
+    #viewport3d {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1;
+    }
+    .cinzel {
+      font-family: 'Cinzel', serif;
+      letter-spacing: 0.25em;
+    }
+    .font-mono-tech {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    /* Dynamic screen-edge frost overlay */
+    #frostOverlay {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 5;
+      box-shadow: inset 0 0 100px rgba(56, 189, 248, 0.25), inset 0 0 180px rgba(186, 230, 253, 0.12);
+      transition: opacity 0.5s ease;
+      background: radial-gradient(circle at center, transparent 65%, rgba(14, 165, 233, 0.18) 95%, rgba(224, 242, 254, 0.35) 100%);
+    }
+    /* Crosshair */
+    #crosshair {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      z-index: 10;
+      width: 8px;
+      height: 8px;
+      border: 1.5px solid rgba(255, 255, 255, 0.7);
+      border-radius: 50%;
+      box-shadow: 0 0 6px rgba(255, 255, 255, 0.8);
+      transition: all 0.2s;
+    }
+    .glass-ui {
+      background: rgba(6, 11, 22, 0.75);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    }
+    .btn-action {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .btn-action:hover {
+      background: rgba(255, 255, 255, 0.2);
+      border-color: rgba(56, 189, 248, 0.8);
+      transform: translateY(-1px);
+    }
+    /* Sliders */
+    input[type=range] {
+      -webkit-appearance: none;
+      background: rgba(255, 255, 255, 0.15);
+      height: 4px;
+      border-radius: 9999px;
+      outline: none;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #38bdf8;
+      cursor: pointer;
+      box-shadow: 0 0 10px #38bdf8;
+    }
+    /* Toast */
+    #notifToast {
+      transform: translate(-50%, 150%);
+      transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    #notifToast.show {
+      transform: translate(-50%, 0);
+    }
+  </style>
+</head>
+<body class="relative w-full h-full select-none overflow-hidden bg-black text-slate-100">
+
+  <!-- 3D Canvas Viewport -->
+  <div id="viewport3d"></div>
+  <div id="frostOverlay" class="opacity-40"></div>
+  <div id="crosshair"></div>
+
+  <!-- Start / Unlocked Overlay (Click to Play) -->
+  <div id="blocker" class="absolute inset-0 z-40 bg-black/85 backdrop-blur-md flex items-center justify-center cursor-pointer transition-opacity duration-500">
+    <div class="glass-ui max-w-lg w-11/12 p-8 rounded-3xl text-center border-cyan-500/30 shadow-[0_0_80px_rgba(6,182,212,0.2)]">
+      <div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-cyan-500/10 border border-cyan-400/40 flex items-center justify-center text-cyan-300">
+        <i class="ph-bold ph-compass text-3xl animate-pulse"></i>
+      </div>
+      <h1 class="text-2xl font-black cinzel text-white mb-1">ARCTIC DISCOVERY 3D</h1>
+      <p class="text-xs uppercase font-mono-tech tracking-widest text-emerald-400 mb-6 font-bold">AAA First-Person Survival Simulator</p>
+      
+      <p class="text-sm text-slate-300 leading-relaxed mb-6">
+        Haqiqiy shimoliy qutb ekspeditsiyasi. Qorli qoyalar, olovli gulxan, issiq yog'och uycha va osmondagi jonli 3D Shimol Yog'dusi (Aurora Borealis) olamiga xush kelibsiz!
+      </p>
+
+      <div class="grid grid-cols-2 gap-3 text-left text-xs font-mono-tech mb-8 bg-black/40 p-4 rounded-2xl border border-white/10">
+        <div class="flex items-center gap-2"><span class="px-2 py-0.5 rounded bg-white/20 text-white font-bold">W A S D</span> Yurish</div>
+        <div class="flex items-center gap-2"><span class="px-2 py-0.5 rounded bg-white/20 text-white font-bold">SHIFT</span> Yugurish</div>
+        <div class="flex items-center gap-2"><span class="px-2 py-0.5 rounded bg-white/20 text-white font-bold">F</span> Fonar (Chiroq)</div>
+        <div class="flex items-center gap-2"><span class="px-2 py-0.5 rounded bg-white/20 text-white font-bold">SPACE</span> Sakrash</div>
+        <div class="flex items-center gap-2"><span class="px-2 py-0.5 rounded bg-white/20 text-white font-bold">M</span> Gulxanga borish</div>
+        <div class="flex items-center gap-2"><span class="px-2 py-0.5 rounded bg-white/20 text-white font-bold">TAB</span> Uychaga borish</div>
+      </div>
+
+      <div class="py-3 px-6 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 font-bold text-sm tracking-wide shadow-lg shadow-cyan-500/30 flex items-center justify-center gap-2 hover:scale-[1.02] transition">
+        <i class="ph-fill ph-play text-base"></i>
+        <span>EKRANNI BOSING VA BOSHLANG</span>
+      </div>
+      <p class="text-[10px] text-slate-400 mt-3 font-mono-tech">Sichqonchani qulflash va ovoz effektlarini faollashtirish uchun bosing</p>
+    </div>
+  </div>
+
+  <!-- HUD Interface (Active in Game) -->
+  <div id="gameHUD" class="absolute inset-0 z-20 pointer-events-none flex flex-col justify-between p-4 md:p-6 transition-opacity duration-300">
+    
+    <!-- Top Bar: Compass Ribbon & Quick Options -->
+    <header class="flex items-center justify-between">
+      <!-- Player Location & Date -->
+      <div class="glass-ui px-4 py-2 rounded-2xl pointer-events-auto flex items-center gap-3">
+        <div class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></div>
+        <div>
+          <div class="text-[10px] font-mono-tech text-cyan-300 font-bold tracking-wider uppercase">Svalbard Arktika Bazasida</div>
+          <div class="text-xs font-semibold text-white/90">78° 13' 48" N • 15° 38' 22" E</div>
+        </div>
+      </div>
+
+      <!-- Real-Time Dynamic Compass Heading -->
+      <div class="hidden sm:flex glass-ui px-6 py-2 rounded-2xl items-center gap-4 text-xs font-mono-tech">
+        <span class="text-slate-400">KOMPAS:</span>
+        <div class="flex items-center gap-3 text-cyan-400 font-bold">
+          <i class="ph-bold ph-navigation-arrow text-emerald-400" id="compassIcon"></i>
+          <span id="compassHeading">N 012°</span>
+        </div>
+      </div>
+
+      <!-- Control toggles -->
+      <div class="flex items-center gap-2 pointer-events-auto">
+        <button id="btnFlashlight" class="glass-ui btn-action px-3 py-2 rounded-xl text-white flex items-center gap-2 text-xs font-medium" title="Fonarni yoqish/o'chirish (F)">
+          <i class="ph-bold ph-flashlight text-amber-400 text-sm" id="flashlightIcon"></i>
+          <span class="hidden md:inline" id="flashlightStatus">Fonar: Yoqiq</span>
+        </button>
+
+        <button id="btnPhoto" class="glass-ui btn-action px-3 py-2 rounded-xl text-white flex items-center gap-2 text-xs font-medium" title="4K Surat olish">
+          <i class="ph-bold ph-camera text-cyan-400 text-sm"></i>
+          <span class="hidden md:inline">4K Rasm</span>
+        </button>
+
+        <button id="btnSettings" class="glass-ui btn-action p-2.5 rounded-xl text-white" title="Yog'du Sozlamalari">
+          <i class="ph-bold ph-sliders-horizontal text-sm text-cyan-300"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- Bottom Bar: Status Meters & Survival Vitals -->
+    <footer class="flex flex-col md:flex-row items-end md:items-end justify-between gap-4">
+      
+      <!-- Survival Vitals (Cold / Stamina) -->
+      <div class="glass-ui p-4 rounded-2xl pointer-events-auto max-w-xs w-full space-y-3">
+        <!-- Body Warmth Meter -->
+        <div>
+          <div class="flex justify-between items-center text-xs font-mono-tech mb-1">
+            <span class="flex items-center gap-1.5 text-slate-300">
+              <i class="ph-fill ph-thermometer-cold text-cyan-400"></i>
+              <span>Tana Harorati</span>
+            </span>
+            <span id="tempValue" class="text-cyan-300 font-bold">36.6°C</span>
+          </div>
+          <div class="w-full h-2 rounded-full bg-slate-800/80 overflow-hidden p-0.5 border border-white/10">
+            <div id="warmthBar" class="h-full rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400 transition-all duration-300 w-full"></div>
+          </div>
+          <p id="warmthStatus" class="text-[9px] font-mono-tech text-emerald-400 mt-1">Gulxan atrofida isinmoqda</p>
+        </div>
+
+        <!-- Stamina Meter -->
+        <div>
+          <div class="flex justify-between items-center text-xs font-mono-tech mb-1">
+            <span class="flex items-center gap-1.5 text-slate-300">
+              <i class="ph-fill ph-lightning text-amber-400"></i>
+              <span>Chidam / Energiya</span>
+            </span>
+            <span id="staminaValue" class="text-amber-400 font-bold">100%</span>
+          </div>
+          <div class="w-full h-1.5 rounded-full bg-slate-800/80 overflow-hidden border border-white/10">
+            <div id="staminaBar" class="h-full rounded-full bg-amber-400 transition-all duration-100 w-full"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Teleport & Key Helper -->
+      <div class="glass-ui px-4 py-2.5 rounded-2xl pointer-events-auto flex items-center gap-3 text-xs font-mono-tech text-slate-300">
+        <span class="hidden sm:inline text-slate-500">TEZKOR KO'CHISH:</span>
+        <button id="tpCampfire" class="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-amber-300 flex items-center gap-1.5 transition">
+          <i class="ph-fill ph-campfire"></i>
+          <span>Gulxan (M)</span>
+        </button>
+        <button id="tpCabin" class="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-cyan-300 flex items-center gap-1.5 transition">
+          <i class="ph-fill ph-house-line"></i>
+          <span>Uycha (TAB)</span>
+        </button>
+        <button id="tpLake" class="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-emerald-300 flex items-center gap-1.5 transition">
+          <i class="ph-fill ph-waves"></i>
+          <span>Muz Ko'li</span>
+        </button>
+      </div>
+
+    </footer>
+  </div>
+
+  <!-- Settings Panel (Flyout Drawer) -->
+  <aside id="settingsDrawer" class="absolute top-20 right-4 md:right-6 w-80 glass-ui rounded-3xl p-5 z-30 transition-all duration-300 translate-x-[120%] opacity-0 pointer-events-none">
+    <div class="flex items-center justify-between pb-3 mb-4 border-b border-white/10">
+      <div class="flex items-center gap-2">
+        <i class="ph-bold ph-sparkle text-cyan-400"></i>
+        <h3 class="text-sm font-bold text-white tracking-wide">Yog'du & Muhit</h3>
+      </div>
+      <button id="closeSettings" class="text-slate-400 hover:text-white">
+        <i class="ph-bold ph-x text-base"></i>
+      </button>
+    </div>
+
+    <div class="space-y-4 text-xs font-mono-tech">
+      <div>
+        <div class="flex justify-between mb-1.5 text-slate-300">
+          <span>Yog'du Yorqinligi</span>
+          <span id="lblAuroraInt" class="text-cyan-400 font-bold">1.6x</span>
+        </div>
+        <input type="range" id="slAuroraInt" min="0.4" max="3.0" step="0.1" value="1.6" class="w-full">
+      </div>
+
+      <div>
+        <div class="flex justify-between mb-1.5 text-slate-300">
+          <span>Qor Qalinligi (Zarrachalar)</span>
+          <span id="lblSnowCount" class="text-cyan-400 font-bold">5,000</span>
+        </div>
+        <input type="range" id="slSnowCount" min="1000" max="9000" step="500" value="5000" class="w-full">
+      </div>
+
+      <div>
+        <div class="flex justify-between mb-1.5 text-slate-300">
+          <span>Arktik Shamol Kuchlanishi</span>
+          <span id="lblWindSpeed" class="text-cyan-400 font-bold">2.4 m/s</span>
+        </div>
+        <input type="range" id="slWindSpeed" min="0.2" max="6.0" step="0.2" value="2.4" class="w-full">
+      </div>
+
+      <div class="pt-2 border-t border-white/10">
+        <label class="block text-slate-300 mb-2">Spektral Rejim:</label>
+        <div class="grid grid-cols-2 gap-2">
+          <button class="pal-opt btn-action p-2 rounded-xl text-emerald-300 border-emerald-500/40 bg-emerald-950/30 text-left font-bold" data-theme="emerald">Zümrad Yashil</button>
+          <button class="pal-opt btn-action p-2 rounded-xl text-rose-300 text-left" data-theme="storm">Quyosh Bo'roni</button>
+          <button class="pal-opt btn-action p-2 rounded-xl text-cyan-300 text-left" data-theme="cyan">Muzlik Mavj</button>
+          <button class="pal-opt btn-action p-2 rounded-xl text-violet-300 text-left" data-theme="violet">Binafsha Tush</button>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Notification Toast -->
+  <div id="notifToast" class="fixed bottom-24 left-1/2 -translate-x-1/2 glass-ui px-4 py-2.5 rounded-2xl text-white text-xs font-mono-tech flex items-center gap-2.5 shadow-2xl z-50 pointer-events-none border border-cyan-400/40">
+    <i class="ph-fill ph-check-circle text-emerald-400 text-base" id="toastIcon"></i>
+    <span id="toastMsg">Foto 4K formatda yuklab olindi</span>
+  </div>
+  <script>
+    // Simulator State & Player Physics
+    const gameState = {
+      isLocked: false,
+      flashlightOn: true,
+      warmth: 100, // 0 to 100
+      stamina: 100,
+      isSprinting: false,
+      isMoving: false,
+      auroraIntensity: 1.6,
+      auroraTheme: 'emerald',
+      windSpeed: 2.4,
+      snowCount: 5000,
+      time: 0
+    };
+
+    // Color palettes for volumetric northern lights
+    const AURORA_THEMES = {
+      emerald: {
+        base: new THREE.Color(0.0, 1.0, 0.52),
+        mid: new THREE.Color(0.0, 0.85, 1.0),
+        top: new THREE.Color(0.65, 0.15, 0.85)
+      },
+      storm: {
+        base: new THREE.Color(1.0, 0.1, 0.35),
+        mid: new THREE.Color(1.0, 0.65, 0.4),
+        top: new THREE.Color(0.7, 0.2, 0.95)
+      },
+      cyan: {
+        base: new THREE.Color(0.0, 0.92, 1.0),
+        mid: new THREE.Color(0.2, 0.5, 1.0),
+        top: new THREE.Color(0.1, 0.8, 0.5)
+      },
+      violet: {
+        base: new THREE.Color(0.55, 0.2, 1.0),
+        mid: new THREE.Color(0.95, 0.25, 0.75),
+        top: new THREE.Color(0.25, 0.7, 1.0)
+      }
+    };
+
+    // Scene & Renderer
+    const container = document.getElementById('viewport3d');
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x020814, 0.0016);
+
+    const camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 8000);
+    // Initial starting position (standing on snow near campfire and cabin)
+    camera.position.set(0, 5, 20);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true, powerPreference: 'high-performance' });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.3;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    container.appendChild(renderer.domElement);
+
+    // PointerLock Controls for First Person Walk
+    const controls = new THREE.PointerLockControls(camera, renderer.domElement);
+
+    // Helper to generate procedural noise textures without external images
+    function createNoiseCanvas(w, h, type = 'snow') {
+      const c = document.createElement('canvas');
+      c.width = w;
+      c.height = h;
+      const ctx = c.getContext('2d');
+      const imgData = ctx.createImageData(w, h);
+      const d = imgData.data;
+
+      for (let i = 0; i < w * h; i++) {
+        const idx = i * 4;
+        if (type === 'snow') {
+          const val = 210 + Math.floor(Math.random() * 45);
+          d[idx] = val;
+          d[idx + 1] = val + 2;
+          d[idx + 2] = val + 5; // Cold blue tint
+          d[idx + 3] = 255;
+        } else if (type === 'bark') {
+          const val = 50 + Math.floor(Math.random() * 35);
+          d[idx] = val + 15;
+          d[idx + 1] = val + 8;
+          d[idx + 2] = val;
+          d[idx + 3] = 255;
+        } else if (type === 'ice') {
+          const val = 180 + Math.floor(Math.random() * 60);
+          d[idx] = Math.floor(val * 0.7);
+          d[idx + 1] = val;
+          d[idx + 2] = Math.min(255, val + 20);
+          d[idx + 3] = 255;
+        }
+      }
+      ctx.putImageData(imgData, 0, 0);
+      const texture = new THREE.CanvasTexture(c);
+      texture.wrapS = THREE.RepeatWrapping;
+      texture.wrapT = THREE.RepeatWrapping;
+      return texture;
+    }
+
+    const snowTexture = createNoiseCanvas(256, 256, 'snow');
+    snowTexture.repeat.set(60, 60);
+
+    const barkTexture = createNoiseCanvas(128, 128, 'bark');
+    barkTexture.repeat.set(2, 8);
+
+    // Web Audio Synthesizer: Snow crunch footsteps, howling arctic wind, crackling fire
+    let audioCtx = null;
+    let windGain = null;
+    let fireGain = null;
+    let lastStepTime = 0;
+
+    function initWebAudio() {
+      if (audioCtx) return;
+      try {
+        const AudioClass = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new AudioClass();
+
+        // 1. Howling Arctic Wind (Pink noise + LowPass/BandPass sweep)
+        const windBufferSize = audioCtx.sampleRate * 2;
+        const windBuffer = audioCtx.createBuffer(1, windBufferSize, audioCtx.sampleRate);
+        const data = windBuffer.getChannelData(0);
+        let b0 = 0, b1 = 0, b2 = 0;
+        for (let i = 0; i < windBufferSize; i++) {
+          const white = Math.random() * 2 - 1;
+          b0 = 0.99886 * b0 + white * 0.0555179;
+          b1 = 0.99332 * b1 + white * 0.0750759;
+          b2 = 0.96900 * b2 + white * 0.1538520;
+          data[i] = (b0 + b1 + b2) * 0.5;
+        }
+        const windSource = audioCtx.createBufferSource();
+        windSource.buffer = windBuffer;
+        windSource.loop = true;
+
+        const windFilter = audioCtx.createBiquadFilter();
+        windFilter.type = 'bandpass';
+        windFilter.frequency.setValueAtTime(320, audioCtx.currentTime);
+        windFilter.Q.setValueAtTime(2.0, audioCtx.currentTime);
+
+        windGain = audioCtx.createGain();
+        windGain.gain.setValueAtTime(0.22, audioCtx.currentTime);
+
+        windSource.connect(windFilter);
+        windFilter.connect(windGain);
+        windGain.connect(audioCtx.destination);
+        windSource.start();
+
+        // 2. Crackling Campfire Synthesis (Burst clicks & low rumble)
+        const fireBufferSize = audioCtx.sampleRate * 1.5;
+        const fireBuffer = audioCtx.createBuffer(1, fireBufferSize, audioCtx.sampleRate);
+        const fData = fireBuffer.getChannelData(0);
+        for (let i = 0; i < fireBufferSize; i++) {
+          // Sharp random crackle impulse
+          if (Math.random() < 0.003) {
+            fData[i] = (Math.random() * 2 - 1) * 0.9;
+          } else {
+            fData[i] = (Math.random() * 2 - 1) * 0.04;
+          }
+        }
+        const fireSource = audioCtx.createBufferSource();
+        fireSource.buffer = fireBuffer;
+        fireSource.loop = true;
+
+        const fireFilter = audioCtx.createBiquadFilter();
+        fireFilter.type = 'lowpass';
+        fireFilter.frequency.setValueAtTime(1400, audioCtx.currentTime);
+
+        fireGain = audioCtx.createGain();
+        fireGain.gain.setValueAtTime(0.18, audioCtx.currentTime);
+
+        fireSource.connect(fireFilter);
+        fireFilter.connect(fireGain);
+        fireGain.connect(audioCtx.destination);
+        fireSource.start();
+
+      } catch (e) {
+        console.warn("Audio unavailable:", e);
+      }
+    }
+
+    // Dynamic Snow Step Crunch
+    function playSnowFootstep(isRunning) {
+      if (!audioCtx || audioCtx.state !== 'running') return;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      const filter = audioCtx.createBiquadFilter();
+
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(isRunning ? 95 : 75, audioCtx.currentTime);
+
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(isRunning ? 800 : 650, audioCtx.currentTime);
+      filter.Q.setValueAtTime(1.2, audioCtx.currentTime);
+
+      gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.16);
+
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(audioCtx.destination);
+
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.18);
+    }
+    // Ambient and Celestial Moonlight
+    const ambientLight = new THREE.AmbientLight(0x0e1b2f, 1.4);
+    scene.add(ambientLight);
+
+    const moonLight = new THREE.DirectionalLight(0xb4d2ff, 1.8);
+    moonLight.position.set(-200, 450, -350);
+    moonLight.castShadow = true;
+    moonLight.shadow.mapSize.width = 2048;
+    moonLight.shadow.mapSize.height = 2048;
+    moonLight.shadow.camera.near = 50;
+    moonLight.shadow.camera.far = 1200;
+    moonLight.shadow.camera.left = -300;
+    moonLight.shadow.camera.right = 300;
+    moonLight.shadow.camera.top = 300;
+    moonLight.shadow.camera.bottom = -300;
+    moonLight.shadow.bias = -0.0005;
+    scene.add(moonLight);
+
+    // Glowing Moon Sphere
+    const moonGeo = new THREE.SphereGeometry(30, 32, 32);
+    const moonMat = new THREE.MeshBasicMaterial({ color: 0xe6f3ff });
+    const moonMesh = new THREE.Mesh(moonGeo, moonMat);
+    moonMesh.position.copy(moonLight.position).multiplyScalar(4);
+    scene.add(moonMesh);
+
+    // Realistic Starfield (8,000 Points)
+    const starCount = 8000;
+    const starGeo = new THREE.BufferGeometry();
+    const starPositions = new Float32Array(starCount * 3);
+    const starColors = new Float32Array(starCount * 3);
+
+    for (let i = 0; i < starCount; i++) {
+      const radius = 3000 + Math.random() * 500;
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(Math.random() * 1.95 - 0.95);
+
+      starPositions[i * 3] = radius * Math.sin(phi) * Math.cos(theta);
+      starPositions[i * 3 + 1] = Math.abs(radius * Math.cos(phi)) + 60;
+      starPositions[i * 3 + 2] = radius * Math.sin(phi) * Math.sin(theta);
+
+      const isWarm = Math.random() > 0.8;
+      starColors[i * 3] = isWarm ? 1.0 : 0.75 + Math.random() * 0.25;
+      starColors[i * 3 + 1] = isWarm ? 0.9 : 0.85 + Math.random() * 0.15;
+      starColors[i * 3 + 2] = 1.0;
+    }
+    starGeo.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+    starGeo.setAttribute('color', new THREE.BufferAttribute(starColors, 3));
+
+    const starMat = new THREE.PointsMaterial({
+      size: 3.2,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.9,
+      blending: THREE.AdditiveBlending
+    });
+    const starField = new THREE.Points(starGeo, starMat);
+    scene.add(starField);
+
+    // Realistic Curving Volumetric Aurora Ribbons using custom GLSL
+    const auroraRibbons = [];
+    const ribbonCount = 5;
+
+    for (let r = 0; r < ribbonCount; r++) {
+      const ribbonWidth = 2800;
+      const ribbonHeight = 650;
+      const geo = new THREE.PlaneGeometry(ribbonWidth, ribbonHeight, 140, 30);
+      geo.translate(0, ribbonHeight / 2, 0);
+
+      const mat = new THREE.ShaderMaterial({
+        uniforms: {
+          uTime: { value: 0 },
+          uBaseColor: { value: AURORA_THEMES.emerald.base },
+          uMidColor: { value: AURORA_THEMES.emerald.mid },
+          uTopColor: { value: AURORA_THEMES.emerald.top },
+          uIntensity: { value: gameState.auroraIntensity },
+          uOffset: { value: r * 1.45 }
+        },
+        vertexShader: `
+          uniform float uTime;
+          uniform float uOffset;
+          varying vec2 vUv;
+          varying vec3 vWorldPos;
+
+          void main() {
+            vUv = uv;
+            vec3 pos = position;
+            float t = uTime * 0.7 + uOffset;
+
+            // Multi-frequency wave deformation
+            float w1 = sin(pos.x * 0.0022 + t * 0.8) * 80.0;
+            float w2 = cos(pos.x * 0.0055 - t * 1.2) * 35.0;
+            float w3 = sin(pos.x * 0.015 + t * 1.8) * 12.0;
+
+            // Ray flutter amplitude grows higher up in the ionosphere
+            float heightScale = pow(uv.y, 1.3);
+            pos.z += (w1 + w2 + w3) * (0.3 + heightScale * 1.6);
+            pos.y += sin(pos.x * 0.06 + t * 3.5) * (5.0 * heightScale);
+
+            vec4 worldPos = modelMatrix * vec4(pos, 1.0);
+            vWorldPos = worldPos.xyz;
+            gl_Position = projectionMatrix * viewMatrix * worldPos;
+          }
+        `,
+        fragmentShader: `
+          uniform vec3 uBaseColor;
+          uniform vec3 uMidColor;
+          uniform vec3 uTopColor;
+          uniform float uIntensity;
+          uniform float uTime;
+          uniform float uOffset;
+          varying vec2 vUv;
+
+          void main() {
+            float y = vUv.y;
+            float x = vUv.x;
+            float t = uTime + uOffset;
+
+            // Atmospheric ion transition: Green Oxygen at bottom -> Violet/Red Nitrogen at high altitude
+            vec3 col;
+            if (y < 0.45) {
+              col = mix(uBaseColor, uMidColor, smoothstep(0.0, 0.45, y));
+            } else {
+              col = mix(uMidColor, uTopColor, smoothstep(0.45, 1.0, y));
+            }
+
+            // Rapid vertical fluting folds
+            float rays = sin(x * 150.0 + t * 2.0) * 0.25 + 0.75;
+            rays *= cos(x * 70.0 - t * 1.4) * 0.2 + 0.8;
+
+            // Curtain opacity envelope
+            float bottomLine = smoothstep(0.0, 0.12, y);
+            float topFade = smoothstep(1.0, 0.3, y);
+            float sideFade = smoothstep(0.0, 0.15, x) * smoothstep(1.0, 0.85, x);
+
+            float alpha = bottomLine * topFade * sideFade * rays * (0.42 * uIntensity);
+
+            // Shimmer oscillation
+            alpha *= (sin(t * 0.8 + x * 4.0) * 0.15 + 0.85);
+
+            gl_FragColor = vec4(col * 1.25, alpha);
+          }
+        `,
+        side: THREE.DoubleSide,
+        transparent: true,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+      });
+
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.set((r - 2) * 160, 420 + r * 40, -450 - r * 280);
+      mesh.rotation.y = (r - 2) * 0.14;
+      mesh.rotation.x = 0.06;
+      scene.add(mesh);
+      auroraRibbons.push({ mesh, mat });
+    }
+
+    // Terrain with center fjord lake depression
+    const terrainGeo = new THREE.PlaneGeometry(2400, 2400, 160, 160);
+    terrainGeo.rotateX(-Math.PI / 2);
+
+    const tPos = terrainGeo.attributes.position;
+    for (let i = 0; i < tPos.count; i++) {
+      const x = tPos.getX(i);
+      const z = tPos.getZ(i);
+      const distFromCenter = Math.hypot(x, z);
+
+      // Cabin & Fire clearing area around origin
+      if (distFromCenter < 55) {
+        tPos.setY(i, 0.0);
+        continue;
+      }
+
+      // North fjord lake area (z from -100 to -500, x from -200 to 200)
+      if (z < -80 && z > -520 && Math.abs(x) < 260) {
+        tPos.setY(i, -2.5); // Depressed lake bed
+        continue;
+      }
+
+      // Surrounding dramatic snowy mountain peaks
+      let h = 0;
+      if (distFromCenter > 90) {
+        const factor = Math.min(1.0, (distFromCenter - 90) / 400);
+        const n1 = Math.sin(x * 0.007) * Math.cos(z * 0.007) * 90;
+        const n2 = Math.sin(x * 0.018 + 1.2) * Math.sin(z * 0.018) * 35;
+        const n3 = Math.cos(x * 0.035) * Math.sin(z * 0.035) * 12;
+        h = Math.max(0, (n1 + n2 + n3)) * factor;
+      }
+      tPos.setY(i, h);
+    }
+    terrainGeo.computeVertexNormals();
+
+    const terrainMat = new THREE.MeshStandardMaterial({
+      color: 0xdae9f8,
+      roughness: 0.85,
+      metalness: 0.1,
+      map: snowTexture
+    });
+    const terrain = new THREE.Mesh(terrainGeo, terrainMat);
+    terrain.receiveShadow = true;
+    scene.add(terrain);
+
+    // Frozen Ice Sheet Fjord Lake with glassy specular reflections
+    const iceGeo = new THREE.PlaneGeometry(500, 420, 60, 60);
+    iceGeo.rotateX(-Math.PI / 2);
+    const iceMat = new THREE.MeshStandardMaterial({
+      color: 0x88bbdd,
+      roughness: 0.08,
+      metalness: 0.85,
+      transparent: true,
+      opacity: 0.88
+    });
+    const iceSheet = new THREE.Mesh(iceGeo, iceMat);
+    iceSheet.position.set(0, -0.6, -300);
+    iceSheet.receiveShadow = true;
+    scene.add(iceSheet);
+    const cabinGroup = new THREE.Group();
+    cabinGroup.position.set(-16, 0, -12);
+
+    // Main Log Structure
+    const cabinWallMat = new THREE.MeshStandardMaterial({
+      color: 0x4a2a16,
+      roughness: 0.9,
+      map: barkTexture
+    });
+    const cabinBase = new THREE.Mesh(new THREE.BoxGeometry(14, 8, 18), cabinWallMat);
+    cabinBase.position.y = 4;
+    cabinBase.castShadow = true;
+    cabinBase.receiveShadow = true;
+    cabinGroup.add(cabinBase);
+
+    // Steep Arctic Roof with thick layer of snow
+    const roofGeo = new THREE.ConeGeometry(13, 6, 4);
+    roofGeo.rotateY(Math.PI / 4);
+    const roofMat = new THREE.MeshStandardMaterial({ color: 0xe8f2fb, roughness: 0.7 });
+    const roofMesh = new THREE.Mesh(roofGeo, roofMat);
+    roofMesh.position.y = 11;
+    roofMesh.scale.set(1.15, 1.0, 1.45);
+    roofMesh.castShadow = true;
+    cabinGroup.add(roofMesh);
+
+    // Stone Chimney
+    const chimneyMat = new THREE.MeshStandardMaterial({ color: 0x2d3748, roughness: 0.95 });
+    const chimney = new THREE.Mesh(new THREE.BoxGeometry(2, 9, 2), chimneyMat);
+    chimney.position.set(4.5, 9.5, 3);
+    chimney.castShadow = true;
+    cabinGroup.add(chimney);
+
+    // Wooden Porch and Steps
+    const porchMat = new THREE.MeshStandardMaterial({ color: 0x3d2010, roughness: 0.85 });
+    const porch = new THREE.Mesh(new THREE.BoxGeometry(8, 0.8, 6), porchMat);
+    porch.position.set(0, 0.4, 11);
+    porch.receiveShadow = true;
+    cabinGroup.add(porch);
+
+    // Glowing Frosted Glass Windows
+    const windowMat = new THREE.MeshBasicMaterial({ color: 0xffaa33 });
+    const win1 = new THREE.Mesh(new THREE.PlaneGeometry(3, 3), windowMat);
+    win1.position.set(7.05, 4.5, 0);
+    win1.rotation.y = Math.PI / 2;
+    cabinGroup.add(win1);
+
+    const win2 = new THREE.Mesh(new THREE.PlaneGeometry(3, 3), windowMat);
+    win2.position.set(-7.05, 4.5, 0);
+    win2.rotation.y = -Math.PI / 2;
+    cabinGroup.add(win2);
+
+    // Warm Interior Point Light shining through windows onto snow
+    const cabinLight = new THREE.PointLight(0xff9922, 2.8, 38, 1.5);
+    cabinLight.position.set(0, 5, 0);
+    cabinGroup.add(cabinLight);
+
+    const porchLantern = new THREE.PointLight(0xffa500, 1.8, 22, 1.8);
+    porchLantern.position.set(0, 5.5, 9.2);
+    cabinGroup.add(porchLantern);
+
+    scene.add(cabinGroup);
+
+    const fireGroup = new THREE.Group();
+    fireGroup.position.set(8, 0, 8);
+
+    // Stone ring around fire
+    const stoneMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.9 });
+    for (let s = 0; s < 10; s++) {
+      const angle = (s / 10) * Math.PI * 2;
+      const stone = new THREE.Mesh(new THREE.DodecahedronGeometry(0.5 + Math.random() * 0.2), stoneMat);
+      stone.position.set(Math.cos(angle) * 2.2, 0.35, Math.sin(angle) * 2.2);
+      stone.rotation.set(Math.random(), Math.random(), 0);
+      stone.castShadow = true;
+      fireGroup.add(stone);
+    }
+
+    // Wooden fire logs
+    const logMat = new THREE.MeshStandardMaterial({ color: 0x2c1d11, roughness: 0.9 });
+    for (let l = 0; l < 4; l++) {
+      const log = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.25, 3.2, 6), logMat);
+      log.rotation.z = Math.PI / 3;
+      log.rotation.y = (l / 4) * Math.PI;
+      log.position.y = 0.4;
+      log.castShadow = true;
+      fireGroup.add(log);
+    }
+
+    // Flickering Fire Light
+    const fireLight = new THREE.PointLight(0xff6600, 3.8, 45, 1.6);
+    fireLight.position.set(0, 1.8, 0);
+    fireLight.castShadow = true;
+    fireLight.shadow.bias = -0.002;
+    fireGroup.add(fireLight);
+
+    // Animated Fire Flame Particles & Embers
+    const emberCount = 80;
+    const emberGeo = new THREE.BufferGeometry();
+    const emberPos = new Float32Array(emberCount * 3);
+    const emberVel = new Float32Array(emberCount * 3);
+
+    for (let i = 0; i < emberCount; i++) {
+      emberPos[i * 3] = (Math.random() - 0.5) * 1.5;
+      emberPos[i * 3 + 1] = Math.random() * 3.5;
+      emberPos[i * 3 + 2] = (Math.random() - 0.5) * 1.5;
+
+      emberVel[i * 3] = (Math.random() - 0.5) * 0.6;
+      emberVel[i * 3 + 1] = 1.2 + Math.random() * 2.5;
+      emberVel[i * 3 + 2] = (Math.random() - 0.5) * 0.6;
+    }
+    emberGeo.setAttribute('position', new THREE.BufferAttribute(emberPos, 3));
+
+    const emberMat = new THREE.PointsMaterial({
+      color: 0xff6b1a,
+      size: 0.6,
+      transparent: true,
+      opacity: 0.9,
+      blending: THREE.AdditiveBlending
+    });
+    const embersMesh = new THREE.Points(emberGeo, emberMat);
+    fireGroup.add(embersMesh);
+
+    scene.add(fireGroup);
+
+    function createPineTree(x, z, scale = 1.0) {
+      const tree = new THREE.Group();
+      tree.position.set(x, 0, z);
+
+      // Trunk
+      const trunkMat = new THREE.MeshStandardMaterial({ color: 0x231709, roughness: 0.9 });
+      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.35 * scale, 0.5 * scale, 4 * scale, 6), trunkMat);
+      trunk.position.y = 2 * scale;
+      trunk.castShadow = true;
+      tree.add(trunk);
+
+      // 3 Tiers of Conifer Needles laden with snow
+      const foliageMat = new THREE.MeshStandardMaterial({ color: 0x1e3a29, roughness: 0.8 });
+      const snowLeafMat = new THREE.MeshStandardMaterial({ color: 0xedf6fc, roughness: 0.7 });
+
+      for (let t = 0; t < 3; t++) {
+        const radius = (2.6 - t * 0.65) * scale;
+        const h = (3.2 - t * 0.5) * scale;
+        const tier = new THREE.Mesh(new THREE.ConeGeometry(radius, h, 7), foliageMat);
+        tier.position.y = (3.5 + t * 2.2) * scale;
+        tier.castShadow = true;
+        tree.add(tier);
+
+        // Snow cap atop cone tier
+        const snowCap = new THREE.Mesh(new THREE.ConeGeometry(radius * 0.85, h * 0.45, 7), snowLeafMat);
+        snowCap.position.y = (3.5 + t * 2.2 + 0.6) * scale;
+        tree.add(snowCap);
+      }
+      return tree;
+    }
+
+    // Place trees avoiding the lake and cabin clearing
+    const pineTrees = [];
+    for (let i = 0; i < 75; i++) {
+      const radius = 35 + Math.random() * 240;
+      const angle = Math.random() * Math.PI * 2;
+      const x = Math.cos(angle) * radius;
+      const z = Math.sin(angle) * radius;
+
+      // Avoid lake
+      if (z < -60 && z > -540 && Math.abs(x) < 280) continue;
+
+      const scale = 0.8 + Math.random() * 0.8;
+      const tree = createPineTree(x, z, scale);
+      scene.add(tree);
+      pineTrees.push(tree);
+    }
+    // Realistic First Person Flashlight (attached directly to player camera)
+    const flashlight = new THREE.SpotLight(0xfffaed, 5.0, 90, Math.PI / 7, 0.4, 1.2);
+    flashlight.position.set(0.3, -0.35, 0.2); // Sits at player's right hand
+    flashlight.target.position.set(0, 0, -10);
+    flashlight.castShadow = true;
+    flashlight.shadow.mapSize.width = 1024;
+    flashlight.shadow.mapSize.height = 1024;
+    camera.add(flashlight);
+    camera.add(flashlight.target);
+    scene.add(camera);
+
+    // Player Cold Breath Vapor Particle Emitter
+    const breathCount = 20;
+    const breathGeo = new THREE.BufferGeometry();
+    const breathPos = new Float32Array(breathCount * 3);
+    breathGeo.setAttribute('position', new THREE.BufferAttribute(breathPos, 3));
+
+    const breathMat = new THREE.PointsMaterial({
+      color: 0xddf4ff,
+      size: 0.8,
+      transparent: true,
+      opacity: 0.0,
+      blending: THREE.AdditiveBlending
+    });
+    const breathMesh = new THREE.Points(breathGeo, breathMat);
+    scene.add(breathMesh);
+
+    let breathTimer = 0;
+    let breathActive = false;
+    let breathLife = 0;
+
+    // 3D Snowstorm Particle System
+    const maxFlakes = 9000;
+    const snowGeo = new THREE.BufferGeometry();
+    const snowPositions = new Float32Array(maxFlakes * 3);
+    const snowVelocities = new Float32Array(maxFlakes * 3);
+
+    for (let i = 0; i < maxFlakes; i++) {
+      snowPositions[i * 3] = (Math.random() - 0.5) * 350;
+      snowPositions[i * 3 + 1] = Math.random() * 80;
+      snowPositions[i * 3 + 2] = (Math.random() - 0.5) * 350;
+
+      snowVelocities[i * 3] = (Math.random() - 0.5) * 1.5;
+      snowVelocities[i * 3 + 1] = -(Math.random() * 2.5 + 1.2);
+      snowVelocities[i * 3 + 2] = (Math.random() - 0.5) * 1.5;
+    }
+    snowGeo.setAttribute('position', new THREE.BufferAttribute(snowPositions, 3));
+
+    const snowMat = new THREE.PointsMaterial({
+      color: 0xffffff,
+      size: 0.45,
+      transparent: true,
+      opacity: 0.85
+    });
+    const snowMesh = new THREE.Points(snowGeo, snowMat);
+    scene.add(snowMesh);
+    snowGeo.setDrawRange(0, gameState.snowCount);
+
+    const keys = { w: false, a: false, s: false, d: false, shift: false, space: false };
+    const velocity = new THREE.Vector3();
+    const direction = new THREE.Vector3();
+    let canJump = true;
+    let headBobTimer = 0;
+
+    // Pointer Lock setup
+    const blocker = document.getElementById('blocker');
+    blocker.addEventListener('click', () => {
+      initWebAudio();
+      controls.lock();
+    });
+
+    controls.addEventListener('lock', () => {
+      blocker.classList.add('opacity-0', 'pointer-events-none');
+      gameState.isLocked = true;
+      showToast("Ekspeditsiya faollashdi. Sichqoncha qulflangan.");
+    });
+
+    controls.addEventListener('unlock', () => {
+      blocker.classList.remove('opacity-0', 'pointer-events-none');
+      gameState.isLocked = false;
+    });
+
+    // Keyboard Listeners
+    window.addEventListener('keydown', (e) => {
+      switch (e.code) {
+        case 'KeyW': keys.w = true; break;
+        case 'KeyA': keys.a = true; break;
+        case 'KeyS': keys.s = true; break;
+        case 'KeyD': keys.d = true; break;
+        case 'ShiftLeft':
+        case 'ShiftRight': keys.shift = true; break;
+        case 'Space':
+          if (canJump) {
+            velocity.y += 18.0;
+            canJump = false;
+          }
+          break;
+        case 'KeyF':
+          toggleFlashlight();
+          break;
+        case 'KeyM':
+          teleportTo(8, 5, 14, "Gulxan yoniga ko'chirildi");
+          break;
+        case 'Tab':
+          e.preventDefault();
+          teleportTo(-16, 5, 2, "Uycha eshigiga ko'chirildi");
+          break;
+      }
+    });
+
+    window.addEventListener('keyup', (e) => {
+      switch (e.code) {
+        case 'KeyW': keys.w = false; break;
+        case 'KeyA': keys.a = false; break;
+        case 'KeyS': keys.s = false; break;
+        case 'KeyD': keys.d = false; break;
+        case 'ShiftLeft':
+        case 'ShiftRight': keys.shift = false; break;
+      }
+    });
+
+    function toggleFlashlight() {
+      gameState.flashlightOn = !gameState.flashlightOn;
+      flashlight.intensity = gameState.flashlightOn ? 5.0 : 0.0;
+      const statusLbl = document.getElementById('flashlightStatus');
+      const icon = document.getElementById('flashlightIcon');
+      if (gameState.flashlightOn) {
+        statusLbl.innerText = 'Fonar: Yoqiq';
+        icon.className = 'ph-bold ph-flashlight text-amber-400 text-sm';
+        showToast("Fonar yoqildi");
+      } else {
+        statusLbl.innerText = "Fonar: O'chiq";
+        icon.className = 'ph-bold ph-flashlight-slash text-slate-400 text-sm';
+        showToast("Fonar o'chirildi");
+      }
+    }
+
+    function teleportTo(x, y, z, msg) {
+      camera.position.set(x, y, z);
+      velocity.set(0, 0, 0);
+      showToast(msg);
+    }
+    document.getElementById('btnFlashlight').addEventListener('click', toggleFlashlight);
+
+    // Teleport Buttons
+    document.getElementById('tpCampfire').addEventListener('click', () => teleportTo(8, 5, 14, "Gulxan yoniga ko'chirildi"));
+    document.getElementById('tpCabin').addEventListener('click', () => teleportTo(-16, 5, 2, "Uycha eshigiga ko'chirildi"));
+    document.getElementById('tpLake').addEventListener('click', () => teleportTo(0, 5, -140, "Muzlagan ko'l qirg'og'iga ko'chirildi"));
+
+    // Settings Panel Drawer
+    const settingsDrawer = document.getElementById('settingsDrawer');
+    document.getElementById('btnSettings').addEventListener('click', () => {
+      settingsDrawer.classList.toggle('translate-x-[120%]');
+      settingsDrawer.classList.toggle('opacity-0');
+      settingsDrawer.classList.toggle('pointer-events-none');
+    });
+    document.getElementById('closeSettings').addEventListener('click', () => {
+      settingsDrawer.classList.add('translate-x-[120%]', 'opacity-0', 'pointer-events-none');
+    });
+
+    // Sliders
+    document.getElementById('slAuroraInt').addEventListener('input', (e) => {
+      gameState.auroraIntensity = parseFloat(e.target.value);
+      document.getElementById('lblAuroraInt').innerText = gameState.auroraIntensity.toFixed(1) + 'x';
+      auroraRibbons.forEach(r => r.mat.uniforms.uIntensity.value = gameState.auroraIntensity);
+    });
+
+    document.getElementById('slSnowCount').addEventListener('input', (e) => {
+      gameState.snowCount = parseInt(e.target.value, 10);
+      document.getElementById('lblSnowCount').innerText = gameState.snowCount.toLocaleString();
+      snowGeo.setDrawRange(0, gameState.snowCount);
+    });
+
+    document.getElementById('slWindSpeed').addEventListener('input', (e) => {
+      gameState.windSpeed = parseFloat(e.target.value);
+      document.getElementById('lblWindSpeed').innerText = gameState.windSpeed.toFixed(1) + ' m/s';
+    });
+
+    // Theme Selector
+    document.querySelectorAll('.pal-opt').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const themeKey = btn.dataset.theme;
+        gameState.auroraTheme = themeKey;
+        const th = AURORA_THEMES[themeKey];
+        auroraRibbons.forEach(r => {
+          r.mat.uniforms.uBaseColor.value = th.base;
+          r.mat.uniforms.uMidColor.value = th.mid;
+          r.mat.uniforms.uTopColor.value = th.top;
+        });
+        document.querySelectorAll('.pal-opt').forEach(b => b.classList.remove('border-emerald-500/40', 'bg-emerald-950/30', 'font-bold'));
+        btn.classList.add('border-emerald-500/40', 'bg-emerald-950/30', 'font-bold');
+        showToast(`Rang spektri: ${btn.innerText}`);
+      });
+    });
+
+    // 4K Photo Snapshot Tool
+    document.getElementById('btnPhoto').addEventListener('click', () => {
+      renderer.render(scene, camera);
+      const dataUrl = renderer.domElement.toDataURL('image/png');
+      const link = document.createElement('a');
+      link.download = `Arctic-Aurora-4K-${Date.now()}.png`;
+      link.href = dataUrl;
+      link.click();
+      showToast("4K Ultra HD surat saqlandi!");
+    });
+
+    // Toast Notification helper
+    let toastTimer = null;
+    function showToast(text) {
+      const toast = document.getElementById('notifToast');
+      const toastMsg = document.getElementById('toastMsg');
+      toastMsg.innerText = text;
+      toast.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.classList.remove('show'), 2800);
+    }
+
+    // Window Resize
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    const clock = new THREE.Clock();
+
+    function updatePlayerPhysics(delta) {
+      if (!controls.isLocked) return;
+
+      // Friction / deceleration
+      velocity.x -= velocity.x * 10.0 * delta;
+      velocity.z -= velocity.z * 10.0 * delta;
+      velocity.y -= 38.0 * delta; // Gravity
+
+      direction.z = Number(keys.w) - Number(keys.s);
+      direction.x = Number(keys.d) - Number(keys.a);
+      direction.normalize();
+
+      gameState.isMoving = keys.w || keys.a || keys.s || keys.d;
+
+      // Sprinting and stamina
+      let speed = 40.0;
+      if (keys.shift && gameState.stamina > 5 && gameState.isMoving) {
+        speed = 85.0;
+        gameState.isSprinting = true;
+        gameState.stamina = Math.max(0, gameState.stamina - delta * 22);
+      } else {
+        gameState.isSprinting = false;
+        gameState.stamina = Math.min(100, gameState.stamina + delta * 12);
+      }
+
+      // Update stamina bar
+      const staminaBar = document.getElementById('staminaBar');
+      const staminaVal = document.getElementById('staminaValue');
+      staminaBar.style.width = `${gameState.stamina}%`;
+      staminaVal.innerText = `${Math.round(gameState.stamina)}%`;
+
+      if (direction.z !== 0) velocity.z -= direction.z * speed * delta;
+      if (direction.x !== 0) velocity.x -= direction.x * speed * delta;
+
+      // Move player
+      controls.moveRight(-velocity.x * delta);
+      controls.moveForward(-velocity.z * delta);
+      camera.position.y += velocity.y * delta;
+
+      // Floor collision on terrain
+      if (camera.position.y < 5.0) {
+        velocity.y = 0;
+        camera.position.y = 5.0;
+        canJump = true;
+      }
+
+      // Head Bobbing & Snow Footsteps
+      if (gameState.isMoving && canJump) {
+        const bobFrequency = gameState.isSprinting ? 16.0 : 10.0;
+        const bobAmplitude = gameState.isSprinting ? 0.08 : 0.04;
+        headBobTimer += delta * bobFrequency;
+        camera.position.y += Math.sin(headBobTimer) * bobAmplitude;
+
+        // Sound trigger
+        const stepInterval = gameState.isSprinting ? 0.32 : 0.52;
+        if (clock.getElapsedTime() - lastStepTime > stepInterval) {
+          playSnowFootstep(gameState.isSprinting);
+          lastStepTime = clock.getElapsedTime();
+        }
+      }
+
+      // Proximity to Campfire (Distance Check)
+      const distToFire = camera.position.distanceTo(fireGroup.position);
+      const warmthStatus = document.getElementById('warmthStatus');
+      const frostOverlay = document.getElementById('frostOverlay');
+
+      if (distToFire < 14) {
+        // Warming up rapidly
+        gameState.warmth = Math.min(100, gameState.warmth + delta * 15);
+        warmthStatus.innerText = "Gulxan yaqinida isinmoqda (+)";
+        warmthStatus.className = "text-[9px] font-mono-tech text-amber-400 mt-1";
+      } else {
+        // Freezing slowly in the blizzard
+        gameState.warmth = Math.max(15, gameState.warmth - delta * 1.8);
+        warmthStatus.innerText = "Qor bo'ronida sovuq yemokda (-)";
+        warmthStatus.className = "text-[9px] font-mono-tech text-cyan-400 mt-1";
+      }
+
+      // Update Warmth Bar and Screen Frost
+      const warmthBar = document.getElementById('warmthBar');
+      const tempValue = document.getElementById('tempValue');
+      warmthBar.style.width = `${gameState.warmth}%`;
+      const currentTemp = (34.0 + (gameState.warmth / 100) * 2.8).toFixed(1);
+      tempValue.innerText = `${currentTemp}°C`;
+
+      // Frost vignette intensifies when freezing
+      const frostIntensity = (1.0 - (gameState.warmth / 100)) * 0.9;
+      frostOverlay.style.opacity = Math.max(0.15, frostIntensity);
+
+      // Compass calculation
+      const forward = new THREE.Vector3();
+      camera.getWorldDirection(forward);
+      const angleDeg = Math.round((Math.atan2(forward.x, forward.z) * (180 / Math.PI) + 180) % 360);
+      document.getElementById('compassHeading').innerText = `DIR ${angleDeg.toString().padStart(3, '0')}°`;
+      document.getElementById('compassIcon').style.transform = `rotate(${-angleDeg}deg)`;
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const delta = Math.min(0.1, clock.getDelta());
+      const elapsedTime = clock.getElapsedTime();
+      gameState.time = elapsedTime;
+
+      // Update Player
+      updatePlayerPhysics(delta);
+
+      // 1. Animate Aurora Shaders
+      auroraRibbons.forEach(r => {
+        r.mat.uniforms.uTime.value = elapsedTime;
+      });
+
+      // 2. Animate Campfire Flickering
+      fireLight.intensity = 3.4 + Math.sin(elapsedTime * 15.0) * 0.6 + Math.cos(elapsedTime * 22.0) * 0.4;
+      
+      // Animate Fire Embers
+      const ePos = emberGeo.attributes.position.array;
+      for (let i = 0; i < emberCount; i++) {
+        ePos[i * 3 + 1] += emberVel[i * 3 + 1] * delta;
+        ePos[i * 3] += (Math.random() - 0.5) * 0.15;
+        ePos[i * 3 + 2] += (Math.random() - 0.5) * 0.15;
+
+        // Reset dead ember
+        if (ePos[i * 3 + 1] > 6.0) {
+          ePos[i * 3 + 1] = 0.2;
+          ePos[i * 3] = (Math.random() - 0.5) * 1.5;
+          ePos[i * 3 + 2] = (Math.random() - 0.5) * 1.5;
+        }
+      }
+      emberGeo.attributes.position.needsUpdate = true;
+
+      // 3. Animate Falling Snowstorm
+      const sPos = snowGeo.attributes.position.array;
+      for (let i = 0; i < gameState.snowCount; i++) {
+        sPos[i * 3 + 1] += snowVelocities[i * 3 + 1] * delta * 7.0;
+        sPos[i * 3] += (snowVelocities[i * 3] + gameState.windSpeed * 0.4) * delta * 7.0;
+
+        // Wrap around player position
+        if (sPos[i * 3 + 1] < 0.0) sPos[i * 3 + 1] = 75.0;
+        if (sPos[i * 3] > camera.position.x + 160.0) sPos[i * 3] -= 320.0;
+        if (sPos[i * 3] < camera.position.x - 160.0) sPos[i * 3] += 320.0;
+      }
+      snowGeo.attributes.position.needsUpdate = true;
+
+      // 4. Cold Breath Vapor Puff Loop
+      breathTimer += delta;
+      if (breathTimer > 3.8) {
+        breathActive = true;
+        breathLife = 1.0;
+        breathTimer = 0;
+
+        // Emit from just in front of camera
+        const camDir = new THREE.Vector3();
+        camera.getWorldDirection(camDir);
+        const origin = camera.position.clone().add(camDir.multiplyScalar(0.7)).add(new THREE.Vector3(0, -0.2, 0));
+
+        const bPos = breathGeo.attributes.position.array;
+        for (let i = 0; i < breathCount; i++) {
+          bPos[i * 3] = origin.x + (Math.random() - 0.5) * 0.1;
+          bPos[i * 3 + 1] = origin.y + (Math.random() - 0.5) * 0.1;
+          bPos[i * 3 + 2] = origin.z + (Math.random() - 0.5) * 0.1;
+        }
+        breathGeo.attributes.position.needsUpdate = true;
+      }
+
+      if (breathActive) {
+        breathLife -= delta * 1.1;
+        breathMat.opacity = Math.max(0, breathLife * 0.45);
+        const bPos = breathGeo.attributes.position.array;
+        for (let i = 0; i < breathCount; i++) {
+          bPos[i * 3 + 1] += delta * 0.25; // Drifts upward
+          bPos[i * 3] += delta * 0.15;
+        }
+        breathGeo.attributes.position.needsUpdate = true;
+        if (breathLife <= 0) breathActive = false;
+      }
+
+      // Render Scene
+      renderer.render(scene, camera);
+    }
+
+    // Start Simulation loop
+    window.onload = function () {
+      animate();
+    };
+  </script>
+</body>
+</html>
